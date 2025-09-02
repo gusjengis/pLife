@@ -1,26 +1,43 @@
-function resolveURL(path) {
-        const bases = [
-                document.baseURI,
-                (document.currentScript && document.currentScript.src) || null
-        ].filter(Boolean);
+const pointVert = '\
+attribute float xPos;\
+attribute float yPos;\
+attribute vec3  pointColor;\
+attribute vec2  quadOffset;\
+varying vec3 vColor;\
+varying vec2 vUV;\
+uniform float pointSize;\
+uniform vec2  dim;\
+void main() {\
+    vColor = pointColor / 255.0;\
+    vec2 posPx = vec2(xPos, yPos) + 0.5 * pointSize * quadOffset;\
+    float clipX =  2.0 * posPx.x / dim.x - 1.0;\
+    float clipY = -2.0 * posPx.y / dim.y + 1.0;\
+    gl_Position = vec4(clipX, clipY, 0.0, 1.0);\
+    vUV = quadOffset * 0.5 + 0.5; \
+}';
 
-        for (const base of bases) {
-                try {
-                        return new URL(path, base).toString();
-                } catch { }
-        }
-        return path; // last resort
-}
+const pointFrag = '\
+precision mediump float;\
+varying vec3 vColor;\
+varying vec2 vUV;\
+void main() {\
+    vec2 cxy = vUV * 2.0 - 1.0;\
+    if (dot(cxy, cxy) > 1.0) discard;\
+    gl_FragColor = vec4(vColor, 1.0);\
+}';
 
-async function loadShader(path) {
-        const url = resolveURL(path);
-        const res = await fetch(url, { cache: "no-cache" });
-        if (!res.ok) throw new Error(`HTTP ${res.status} while fetching ${url}`);
-        const src = await res.text();
-        const head = src.trim().slice(0, 32);
-        if (head.startsWith("<")) throw new Error(`Expected GLSL, got HTML from ${url}`);
-        return src;
-}
+const rectVert = '\
+attribute vec2 rectPos;\
+void main() {\
+    gl_Position = vec4(rectPos.x, rectPos.y, 0.0, 1);\
+}';
+
+const rectFrag = '\
+precision mediump float;\
+uniform vec3 rectColor;\
+void main() {\
+        gl_FragColor = vec4(rectColor, 1.0);\
+}';
 
 var rectProgram;
 var rectBuffer;
@@ -42,11 +59,7 @@ var pointIndexBuffer;
 var isWebGL2;
 var angle;
 
-async function InitializeShaders() {
-        const pointVert = await loadShader("shaders/point.vert");
-        const pointFrag = await loadShader("shaders/point.frag");
-        const rectVert = await loadShader("shaders/rect.vert");
-        const rectFrag = await loadShader("shaders/rect.frag");
+function InitializeShaders() {
 
         pointProgram = InitializeShader(gl, pointVert, pointFrag);
         pointXPos = gl.getAttribLocation(pointProgram, "xPos");
