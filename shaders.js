@@ -1,6 +1,14 @@
 async function loadShader(url) {
-        const response = await fetch(url);
-        return await response.text();
+        const res = await fetch(url, { cache: "no-cache" });
+        if (!res.ok) {
+                throw new Error(`HTTP ${res.status} while fetching ${url}`);
+        }
+        const src = await res.text();
+        const head = src.trim().slice(0, 32);
+        if (head.startsWith("<")) {
+                throw new Error(`Expected GLSL, got HTML from ${url}`);
+        }
+        return src;
 }
 
 var rectProgram;
