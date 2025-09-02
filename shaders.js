@@ -1,13 +1,24 @@
-async function loadShader(url) {
-        const res = await fetch(url, { cache: "no-cache" });
-        if (!res.ok) {
-                throw new Error(`HTTP ${res.status} while fetching ${url}`);
+function resolveURL(path) {
+        const bases = [
+                document.baseURI,
+                (document.currentScript && document.currentScript.src) || null
+        ].filter(Boolean);
+
+        for (const base of bases) {
+                try {
+                        return new URL(path, base).toString();
+                } catch { }
         }
+        return path; // last resort
+}
+
+async function loadShader(path) {
+        const url = resolveURL(path);
+        const res = await fetch(url, { cache: "no-cache" });
+        if (!res.ok) throw new Error(`HTTP ${res.status} while fetching ${url}`);
         const src = await res.text();
         const head = src.trim().slice(0, 32);
-        if (head.startsWith("<")) {
-                throw new Error(`Expected GLSL, got HTML from ${url}`);
-        }
+        if (head.startsWith("<")) throw new Error(`Expected GLSL, got HTML from ${url}`);
         return src;
 }
 
